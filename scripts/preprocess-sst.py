@@ -1,0 +1,246 @@
+"""
+Preprocessing script for Stanford Sentiment Treebank data.
+
+"""
+
+import os
+import glob
+
+class Tree(object):
+    def __init__(self):
+        self.left = None
+        self.right = None
+
+    def size(self):
+        self.size = 1
+        if self.left is not None:
+            self.size += self.left.size()
+        if self.right is not None:
+            self.size += self.right.size()
+        return self.size
+
+    def label_spans(self):
+        if self.label is not None:
+            self.span = self.label
+            return self.span
+
+        self.span = self.left.label_spans()
+        if self.right is not None:
+            self.span += ' ' + self.right.label_spans()
+        return self.span
+
+    def get_labels(self, spans, labels, dictionary):
+        if self.span in dictionary:
+            spans[self.idx] = self.span
+            labels[self.idx] = dictionary[self.span]
+        if self.left is not None:
+            self.left.get_labels(spans, labels, dictionary)
+        if self.right is not None:
+            self.right.get_labels(spans, labels, dictionary)
+
+def load_trees(dirpath):
+    with open(os.path.join(dirpath, 'parents.txt')) as parentsfile, \
+         open(os.path.join(dirpath, 'sents.txt')) as toksfile:
+        parents, toks, trees = [], [], []
+        for line in parentsfile:
+            parents.append(map(int, line.split()))
+        for line in toksfile:
+            toks.append(line.strip().split())
+        for i in xrange(len(toks)):
+            trees.append(load_tree(parents[i], toks[i]))
+    return trees
+
+def load_tree(parents, labels):
+    trees = []
+    root = None
+    size = len(parents)
+    for i in xrange(size):
+        trees.append(None)
+
+    label_idx = 0
+    for i in xrange(size):
+        if not trees[i]:
+            idx = i
+            prev = None
+            prev_idx = None
+            label = labels[label_idx]
+            label_idx += 1
+            while True:
+                tree = Tree()
+                parent = parents[idx] - 1
+                tree.label = label
+                label = None
+                tree.parent = parent
+                tree.idx = idx
+                if prev is not None:
+                    if tree.left is None:
+                        tree.left = prev
+                    else:
+                        tree.right = prev
+                trees[idx] = tree
+                if parent >= 0 and trees[parent] is not None:
+                    if trees[parent].left is None:
+                        trees[parent].left = tree
+                    else:
+                        trees[parent].right = tree
+                    break
+                elif parent == -1:
+                    root = tree
+                    break
+                else:
+                    prev = tree
+                    prev_idx = idx
+                    idx = parent
+    return root
+
+def make_dirs(dirs):
+    for d in dirs:
+        if not os.path.exists(d):
+            os.makedirs(d)
+
+def load_sents(dirpath):
+    sents = []
+    with open(os.path.join(dirpath, 'SOStr.txt')) as sentsfile:
+        for line in sentsfile:
+            sent = ' '.join(line.split('|'))
+            sents.append(sent.strip())
+    return sents
+
+def load_splits(dirpath):
+    splits = []
+    with open(os.path.join(dirpath, 'datasetSplit.txt')) as splitfile:
+        splitfile.readline()
+        for line in splitfile:
+            idx, split = line.split(',')
+            splits.append(int(split))
+    return splits
+
+def load_parents(dirpath):
+    parents = []
+    with open(os.path.join(dirpath, 'STree.txt')) as parentsfile:
+        for line in parentsfile:
+            p = ' '.join(line.split('|'))
+            parents.append(p.strip())
+    return parents
+
+def load_dictionary(dirpath):
+    labels = []
+    with open(os.path.join(dirpath, 'sentiment_labels.txt')) as labelsfile:
+        labelsfile.readline()
+        for line in labelsfile:
+            idx, rating = line.split('|')
+            idx = int(idx)
+            rating = float(rating)
+            if rating <= 0.2:
+                label = -2
+            elif rating <= 0.4:
+                label = -1
+            elif rating > 0.8:
+                label = +2
+            elif rating > 0.6:
+                label = +1
+            else:
+                label = 0
+            labels.append(label)
+
+    d = {}
+    with open(os.path.join(dirpath, 'dictionary.txt')) as dictionary:
+        for line in dictionary:
+            s, idx = line.split('|')
+            d[s] = labels[int(idx)]
+    return d
+
+def build_vocab(filepaths, dst_path, lowercase=True):
+    vocab = set()
+    for filepath in filepaths:
+        with open(filepath) as f:
+            for line in f:
+                if lowercase:
+                    line = line.lower()
+                vocab |= set(line.split())
+    with open(dst_path, 'w') as f:
+        for w in sorted(vocab):
+            f.write(w + '\n')
+
+def split(sst_dir, train_dir, dev_dir, test_dir):
+    sents = load_sents(sst_dir)
+    splits = load_splits(sst_dir)
+    parents = load_parents(sst_dir)
+
+    with open(os.path.join(train_dir, 'sents.txt'), 'w') as train, \
+         open(os.path.join(dev_dir, 'sents.txt'), 'w') as dev, \
+         open(os.path.join(test_dir, 'sents.txt'), 'w') as test, \
+         open(os.path.join(train_dir, 'parents.txt'), 'w') as trainparents, \
+         open(os.path.join(dev_dir, 'parents.txt'), 'w') as devparents, \
+         open(os.path.join(test_dir, 'parents.txt'), 'w') as testparents:
+
+        for sent, split, p in zip(sents, splits, parents):
+            if split == 1:
+                train.write(sent)
+                train.write('\n')
+                trainparents.write(p)
+                trainparents.write('\n')
+            elif split == 2:
+                test.write(sent)
+                test.write('\n')
+
+                testparents.write(p)
+                testparents.write('\n')
+            else:
+                dev.write(sent)
+                dev.write('\n')
+                devparents.write(p)
+                devparents.write('\n')
+
+def get_labels(tree, dictionary):
+    size = tree.size()
+    spans, labels = [], []
+    for i in xrange(size):
+        labels.append(None)
+        spans.append(None)
+    tree.get_labels(spans, labels, dictionary)
+    return spans, labels
+
+def write_labels(dirpath, dictionary):
+    print('Writing labels for trees in ' + dirpath)
+    with open(os.path.join(dirpath, 'labels.txt'), 'w') as labels:
+        trees = load_trees(dirpath)
+        for i in xrange(len(trees)):
+            trees[i].label_spans()
+            s, l = [], []
+            for j in xrange(trees[i].size()):
+                s.append(None)
+                l.append(None)
+            trees[i].get_labels(s, l, dictionary)
+            labels.write(' '.join(map(str, l)) + '\n')
+
+if __name__ == '__main__':
+    print('=' * 80)
+    print('Preprocessing Stanford Sentiment Treebank')
+    print('=' * 80)
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    data_dir = os.path.join(base_dir, 'data')
+    sst_dir = os.path.join(data_dir, 'sst')
+    train_dir = os.path.join(sst_dir, 'train')
+    dev_dir = os.path.join(sst_dir, 'dev')
+    test_dir = os.path.join(sst_dir, 'test')
+    make_dirs([train_dir, dev_dir, test_dir])
+
+    # produce train/dev/test splits
+    split(sst_dir, train_dir, dev_dir, test_dir)
+
+    # get vocabulary
+    build_vocab(
+        glob.glob(os.path.join(sst_dir, '*/sents.txt')),
+        os.path.join(sst_dir, 'vocab.txt'))
+    build_vocab(
+        glob.glob(os.path.join(sst_dir, '*/sents.txt')),
+        os.path.join(sst_dir, 'vocab-cased.txt'),
+        lowercase=False)
+
+    # write sentiment labels for nodes in trees
+    dictionary = load_dictionary(sst_dir)
+    write_labels(train_dir, dictionary)
+    write_labels(dev_dir, dictionary)
+    write_labels(test_dir, dictionary)
