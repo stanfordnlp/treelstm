@@ -4,6 +4,7 @@ require('nngraph')
 require('optim')
 require('xlua')
 require('sys')
+require('lfs')
 
 treelstm = {}
 
