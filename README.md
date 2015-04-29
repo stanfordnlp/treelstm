@@ -46,19 +46,34 @@ The preprocessing script generates dependency parses of the SICK dataset using t
 
 Alternatively, the download and preprocessing scripts can be called individually.
 
-**For the semantic relatedness task, run:**
+### Semantic Relatedness
+
+The goal of this task is to predict similarity ratings for pairs of sentences. We train and evaluate our models on the [Sentences Involving Compositional Knowledge (SICK)](http://alt.qcri.org/semeval2014/task1/index.php?id=data-and-tools) dataset.
+
+To train models for the semantic relatedness prediction task on the SICK dataset,
+run:
 
 ```
-th relatedness/main.lua
+th relatedness/main.lua --model <dependency|lstm|bilstm> --layers <num_layers> --dim <mem_dim>
 ```
 
-**For the sentiment classification task, run:**
+where:
+
+  - `model`: the LSTM variant to train (default: dependency, i.e. the Dependency Tree LSTM)
+  - `layers`: the number of layers (default: 1, ignored for Tree-LSTMs)
+  - `dim`: the LSTM memory dimension (default: 150)
+
+### Sentiment Classification
+
+The goal of this task is to predict sentiment labels for sentences. For this task, we use the [Stanford Sentiment Treebank](http://nlp.stanford.edu/sentiment/index.html) dataset. Here, there are two sub-tasks: binary and fine-grained. In the binary sub-task, the sentences are labeled `positive` or `negative`. In the fine-grained sub-task, the sentences are labeled `very positive`, `positive`, `neutral`, `negative` or `very negative`.
+
+For this task, run:
 
 ```
 th sentiment/main.lua
 ```
 
-This trains a model for the "fine-grained" 5-class classification sub-task.
+This trains a Constituency Tree LSTM model for the "fine-grained" 5-class classification sub-task.
 
 For the binary classification sub-task, run:
 
@@ -68,4 +83,4 @@ th sentiment/main.lua --binary
 
 Predictions are written to the `predictions` directory and trained model parameters are saved to the `trained_models` directory.
 
-See the [paper](http://arxiv.org/abs/1503.00075) for details on these experiments.
+See the [paper](http://arxiv.org/abs/1503.00075) for more details on these experiments.

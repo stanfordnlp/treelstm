@@ -1,7 +1,6 @@
 --[[
 
-  Tree-LSTM training script for semantic relatedness prediction on the SICK
-  dataset.
+  Training script for semantic relatedness prediction on the SICK dataset.
 
 --]]
 
@@ -14,10 +13,29 @@ function pearson(x, y)
   return x:dot(y) / (x:norm() * y:norm())
 end
 
-header('Tree-LSTM for Semantic Relatedness')
+-- read command line arguments
+local args = lapp [[
+Training script for semantic relatedness prediction on the SICK dataset.
+  -m,--model  (default dependency) Model architecture: [dependency, lstm, bilstm]
+  -l,--layers (default 1)          Number of layers (ignored for Tree-LSTM)
+  -d,--dim    (default 150)        LSTM memory dimension
+]]
 
--- use dependency or constituency parse tree
-local structure = 'dependency'
+local model_name, model_class, model_structure
+if args.model == 'dependency' then
+  model_name = 'Dependency Tree LSTM'
+  model_class = treelstm.TreeLSTMSim
+  model_structure = args.model
+elseif args.model == 'lstm' then
+  model_name = 'LSTM'
+  model_class = treelstm.LSTMSim
+  model_structure = args.model
+elseif args.model == 'bilstm' then
+  model_name = 'Bidirectional LSTM'
+  model_class = treelstm.LSTMSim
+  model_structure = args.model
+end
+header(model_name .. ' for Semantic Relatedness')
 
 -- directory containing dataset files
 local data_dir = 'data/sick/'
@@ -62,9 +80,11 @@ printf('num dev   = %d\n', dev_dataset.size)
 printf('num test  = %d\n', test_dataset.size)
 
 -- initialize model
-local model = treelstm.TreeLSTMSim{
-  emb_vecs = vecs,
-  structure = structure,
+local model = model_class{
+  emb_vecs   = vecs,
+  structure  = model_structure,
+  num_layers = args.layers,
+  mem_dim    = args.dim,
 }
 
 -- number of epochs to train
@@ -79,24 +99,30 @@ model:print_config()
 local train_start = sys.clock()
 local best_dev_score = -1.0
 local best_dev_model = model
-header('Training Tree-LSTM')
+header('Training model')
 for i = 1, num_epochs do
   local start = sys.clock()
   printf('-- epoch %d\n', i)
   model:train(train_dataset)
   printf('-- finished epoch in %.2fs\n', sys.clock() - start)
-  --local train_predictions = model:predict_dataset(train_dataset)
-  --local train_score = pearson(train_predictions, train_dataset.labels)
-  --printf('-- train score: %.4f\n', train_score)
+
+  -- uncomment to compute train scores
+  --[[
+  local train_predictions = model:predict_dataset(train_dataset)
+  local train_score = pearson(train_predictions, train_dataset.labels)
+  printf('-- train score: %.4f\n', train_score)
+  --]]
+
   local dev_predictions = model:predict_dataset(dev_dataset)
   local dev_score = pearson(dev_predictions, dev_dataset.labels)
   printf('-- dev score: %.4f\n', dev_score)
 
   if dev_score > best_dev_score then
     best_dev_score = dev_score
-    best_dev_model = treelstm.TreeLSTMSim{
+    best_dev_model = model_class{
       emb_vecs = vecs,
-      structure = structure,
+      structure = model_structure,
+      num_layers = args.layers,
     }
     best_dev_model.params:copy(model.params)
   end
@@ -114,7 +140,7 @@ if lfs.attributes(treelstm.predictions_dir) == nil then
   lfs.mkdir(treelstm.predictions_dir)
 end
 local predictions_save_path = string.format(
-  treelstm.predictions_dir .. '/rel-treelstm.%d.%s.pred', model.mem_dim, model.structure)
+  treelstm.predictions_dir .. '/rel-%s.%dl.%dd.pred', args.model, args.layers, args.dim)
 local predictions_file = torch.DiskFile(predictions_save_path, 'w')
 print('writing predictions to ' .. predictions_save_path)
 for i = 1, test_predictions:size(1) do
@@ -127,9 +153,9 @@ if lfs.attributes(treelstm.models_dir) == nil then
   lfs.mkdir(treelstm.models_dir)
 end
 local model_save_path = string.format(
-  treelstm.models_dir .. '/rel-treelstm.%d.%s.th', model.mem_dim, model.structure)
+  treelstm.models_dir .. '/rel-%s.%dl.%dd.th', args.model, args.layers, args.dim)
 print('writing model to ' .. model_save_path)
 best_dev_model:save(model_save_path)
 
 -- to load a saved model
--- local loaded = treelstm.TreeLSTMSim.load(model_save_path)
+-- local loaded = model_class.load(model_save_path)

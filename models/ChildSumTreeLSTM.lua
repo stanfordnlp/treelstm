@@ -8,7 +8,8 @@ local ChildSumTreeLSTM, parent = torch.class('treelstm.ChildSumTreeLSTM', 'treel
 
 function ChildSumTreeLSTM:__init(config)
   parent.__init(self, config)
-  self.gate_output = config.gate_output or true
+  self.gate_output = config.gate_output
+  if self.gate_output == nil then self.gate_output = true end
 
   -- composition module
   self.composer = self:new_composer()

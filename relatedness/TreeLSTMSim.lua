@@ -12,7 +12,7 @@ function TreeLSTMSim:__init(config)
   self.batch_size    = config.batch_size    or 25
   self.reg           = config.reg           or 1e-4
   self.structure     = config.structure     or 'dependency'
-  self.sim_nhidden   = config.sim_nhidden   or 150
+  self.sim_nhidden   = config.sim_nhidden   or 50
 
   -- word embedding
   self.emb_vecs = config.emb_vecs
@@ -30,13 +30,11 @@ function TreeLSTMSim:__init(config)
   -- initialize tree-lstm model
   local treelstm_config = {
     in_dim = self.emb_dim,
-    mem_dim = config.mem_dim or 150,
+    mem_dim = self.mem_dim,
     gate_output = false,
   }
   if self.structure == 'dependency' then
     self.treelstm = treelstm.ChildSumTreeLSTM(treelstm_config)
-  elseif self.structure == 'constituency' then
-    self.treelstm = treelstm.BinaryTreeLSTM(treelstm_config)
   else
     error('invalid parse tree type: ' .. self.structure)
   end
@@ -106,6 +104,7 @@ function TreeLSTMSim:train(dataset)
         -- compute relatedness
         local output = self.sim_module:forward{lrep, rrep}
 
+        -- compute loss and backpropagate
         local example_loss = self.criterion:forward(output, targets[j])
         loss = loss + example_loss
         local sim_grad = self.criterion:backward(output, targets[j])
@@ -128,6 +127,7 @@ function TreeLSTMSim:train(dataset)
   xlua.progress(dataset.size, dataset.size)
 end
 
+-- Predict the similarity of a sentence pair.
 function TreeLSTMSim:predict(ltree, rtree, lsent, rsent)
   local linputs = self.emb_vecs:index(1, lsent:long()):double()
   local rinputs = self.emb_vecs:index(1, rsent:long()):double()
@@ -139,6 +139,7 @@ function TreeLSTMSim:predict(ltree, rtree, lsent, rsent)
   return torch.range(1, 5):dot(output:exp())
 end
 
+-- Produce similarity predictions for each sentence pair in the dataset.
 function TreeLSTMSim:predict_dataset(dataset)
   self.treelstm:evaluate()
   local predictions = torch.Tensor(dataset.size)

@@ -12,15 +12,17 @@ include('util/read_data.lua')
 include('util/Tree.lua')
 include('util/Vocab.lua')
 include('layers/CRowAddTable.lua')
+include('models/LSTM.lua')
 include('models/TreeLSTM.lua')
 include('models/ChildSumTreeLSTM.lua')
 include('models/BinaryTreeLSTM.lua')
+include('relatedness/LSTMSim.lua')
 include('relatedness/TreeLSTMSim.lua')
 include('sentiment/TreeLSTMSentiment.lua')
 
 printf = utils.printf
 
--- global paths -- modify if desired
+-- global paths (modify if desired)
 treelstm.data_dir        = 'data'
 treelstm.models_dir      = 'trained_models'
 treelstm.predictions_dir = 'predictions'

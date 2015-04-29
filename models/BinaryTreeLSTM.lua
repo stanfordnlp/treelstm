@@ -159,15 +159,17 @@ function BinaryTreeLSTM:parameters()
   local lp, lg = self.leaf_module:parameters()
   tablex.insertvalues(params, lp)
   tablex.insertvalues(grad_params, lg)
-  local op, og = self.output_module:parameters()
-  tablex.insertvalues(params, op)
-  tablex.insertvalues(grad_params, og)
+  if self.output_module ~= nil then
+    local op, og = self.output_module:parameters()
+    tablex.insertvalues(params, op)
+    tablex.insertvalues(grad_params, og)
+  end
   return params, grad_params
 end
 
---[[
- helper functions
---]]
+--
+-- helper functions
+--
 
 function BinaryTreeLSTM:unpack_state(state)
   local c, h

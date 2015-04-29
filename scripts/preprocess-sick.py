@@ -32,7 +32,7 @@ def constituency_parse(filepath, cp='', tokenize=True):
     dirpath = os.path.dirname(filepath)
     filepre = os.path.splitext(os.path.basename(filepath))[0]
     tokpath = os.path.join(dirpath, filepre + '.toks')
-    parentpath = os.path.join(dirpath, filepre + '.parents')
+    parentpath = os.path.join(dirpath, filepre + '.cparents')
     tokenize_flag = '-tokenize - ' if tokenize else ''
     cmd = ('java -cp %s ConstituencyParse -tokpath %s -parentpath %s %s < %s'
         % (cp, tokpath, parentpath, tokenize_flag, filepath))
