@@ -123,6 +123,7 @@ for i = 1, num_epochs do
       emb_vecs = vecs,
       structure = model_structure,
       num_layers = args.layers,
+      mem_dim    = args.dim,
     }
     best_dev_model.params:copy(model.params)
   end
