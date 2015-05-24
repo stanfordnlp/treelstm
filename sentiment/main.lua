@@ -102,7 +102,7 @@ model:print_config()
 local train_start = sys.clock()
 local best_dev_score = -1.0
 local best_dev_model = model
-header('Training Tree-LSTM')
+header('Training model')
 for i = 1, num_epochs do
   local start = sys.clock()
   printf('-- epoch %d\n', i)
