@@ -64,19 +64,38 @@ function LSTMSentiment:__init(config)
 end
 
 function LSTMSentiment:new_sentiment_module()
-  local module = nn.Sequential()
   local input_dim = self.num_layers * self.mem_dim
-  if self.structure == 'bilstm' then
+  local inputs, vec
+  if self.structure == 'lstm' then
+    local rep = nn.Identity()()
+    if self.num_layers == 1 then
+      vec = {rep}
+    else
+      vec = nn.JoinTable(1)(rep)
+    end
+    inputs = {rep}
+  elseif self.structure == 'bilstm' then
+    local frep, brep = nn.Identity()(), nn.Identity()()
     input_dim = input_dim * 2
-    module:add(nn.JoinTable(1))
+    if self.num_layers == 1 then
+      vec = nn.JoinTable(1){frep, brep}
+    else
+      vec = nn.JoinTable(1){nn.JoinTable(1)(frep), nn.JoinTable(1)(brep)}
+    end
+    inputs = {frep, brep}
   end
+
+  local logprobs
   if self.dropout then
-    module:add(nn.Dropout())
+    logprobs = nn.LogSoftMax()(
+      nn.Linear(input_dim, self.num_classes)(
+        nn.Dropout()(vec)))
+  else
+    logprobs = nn.LogSoftMax()(
+      nn.Linear(input_dim, self.num_classes)(vec))
   end
-  module
-    :add(nn.Linear(input_dim, self.num_classes))
-    :add(nn.LogSoftMax())
-  return module
+
+  return nn.gModule(inputs, {logprobs})
 end
 
 function LSTMSentiment:train(dataset)
