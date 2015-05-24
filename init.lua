@@ -18,6 +18,7 @@ include('models/ChildSumTreeLSTM.lua')
 include('models/BinaryTreeLSTM.lua')
 include('relatedness/LSTMSim.lua')
 include('relatedness/TreeLSTMSim.lua')
+include('sentiment/LSTMSentiment.lua')
 include('sentiment/TreeLSTMSentiment.lua')
 
 printf = utils.printf

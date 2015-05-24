@@ -67,18 +67,18 @@ where:
 
 The goal of this task is to predict sentiment labels for sentences. For this task, we use the [Stanford Sentiment Treebank](http://nlp.stanford.edu/sentiment/index.html) dataset. Here, there are two sub-tasks: binary and fine-grained. In the binary sub-task, the sentences are labeled `positive` or `negative`. In the fine-grained sub-task, the sentences are labeled `very positive`, `positive`, `neutral`, `negative` or `very negative`.
 
-For this task, run:
+To train models for the sentiment classification task on the Stanford Sentiment Treebank, run:
 
 ```
-th sentiment/main.lua
+th sentiment/main.lua --model <constituency|lstm|bilstm> --layers <num_layers> --dim <mem_dim>
 ```
 
 This trains a Constituency Tree LSTM model for the "fine-grained" 5-class classification sub-task.
 
-For the binary classification sub-task, run:
+For the binary classification sub-task, run with the `-b` or `--binary` flag, for example:
 
 ```
-th sentiment/main.lua --binary
+th sentiment/main.lua -m constituency -b
 ```
 
 Predictions are written to the `predictions` directory and trained model parameters are saved to the `trained_models` directory.

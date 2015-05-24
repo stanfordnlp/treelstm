@@ -88,7 +88,7 @@ local model = model_class{
 }
 
 -- number of epochs to train
-local num_epochs = 10
+local num_epochs = 15
 
 -- print information
 header('model configuration')
@@ -134,14 +134,33 @@ printf('finished training in %.2fs\n', sys.clock() - train_start)
 header('Evaluating on test set')
 printf('-- using model with dev score = %.4f\n', best_dev_score)
 local test_predictions = best_dev_model:predict_dataset(test_dataset)
-printf('-- test score: %.4f\n', pearson(test_predictions, test_dataset.labels))
+local test_score = pearson(test_predictions, test_dataset.labels)
+printf('-- test score: %.4f\n', test_score)
 
--- write predictions to disk
+-- create predictions and model directories if necessary
 if lfs.attributes(treelstm.predictions_dir) == nil then
   lfs.mkdir(treelstm.predictions_dir)
 end
-local predictions_save_path = string.format(
-  treelstm.predictions_dir .. '/rel-%s.%dl.%dd.pred', args.model, args.layers, args.dim)
+
+if lfs.attributes(treelstm.models_dir) == nil then
+  lfs.mkdir(treelstm.models_dir)
+end
+
+-- get paths
+local file_idx = 1
+local predictions_save_path, model_save_path
+while true do
+  predictions_save_path = string.format(
+    treelstm.predictions_dir .. '/rel-%s.%dl.%dd.%d.pred', args.model, args.layers, args.dim, file_idx)
+  model_save_path = string.format(
+    treelstm.models_dir .. '/rel-%s.%dl.%dd.%d.th', args.model, args.layers, args.dim, file_idx)
+  if lfs.attributes(predictions_save_path) == nil and lfs.attributes(model_save_path) == nil then
+    break
+  end
+  file_idx = file_idx + 1
+end
+
+-- write predictions to disk
 local predictions_file = torch.DiskFile(predictions_save_path, 'w')
 print('writing predictions to ' .. predictions_save_path)
 for i = 1, test_predictions:size(1) do
@@ -149,12 +168,7 @@ for i = 1, test_predictions:size(1) do
 end
 predictions_file:close()
 
--- write model to disk
-if lfs.attributes(treelstm.models_dir) == nil then
-  lfs.mkdir(treelstm.models_dir)
-end
-local model_save_path = string.format(
-  treelstm.models_dir .. '/rel-%s.%dl.%dd.th', args.model, args.layers, args.dim)
+-- write models to disk
 print('writing model to ' .. model_save_path)
 best_dev_model:save(model_save_path)
 
