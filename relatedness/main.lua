@@ -19,6 +19,7 @@ Training script for semantic relatedness prediction on the SICK dataset.
   -m,--model  (default dependency) Model architecture: [dependency, lstm, bilstm]
   -l,--layers (default 1)          Number of layers (ignored for Tree-LSTM)
   -d,--dim    (default 150)        LSTM memory dimension
+  -e,--epochs (default 10)         Number of training epochs
 ]]
 
 local model_name, model_class, model_structure
@@ -88,7 +89,7 @@ local model = model_class{
 }
 
 -- number of epochs to train
-local num_epochs = 15
+local num_epochs = args.epochs
 
 -- print information
 header('model configuration')

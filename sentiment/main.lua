@@ -17,6 +17,7 @@ Training script for sentiment classification on the SST dataset.
   -m,--model  (default constituency) Model architecture: [constituency, lstm, bilstm]
   -l,--layers (default 1)            Number of layers (ignored for Tree-LSTM)
   -d,--dim    (default 150)          LSTM memory dimension
+  -e,--epochs (default 10)           Number of training epochs
   -b,--binary                        Train and evaluate on binary sub-task
 ]]
 
@@ -91,7 +92,7 @@ local model = model_class{
 }
 
 -- number of epochs to train
-local num_epochs = 15
+local num_epochs = args.epochs
 
 -- print information
 header('model configuration')

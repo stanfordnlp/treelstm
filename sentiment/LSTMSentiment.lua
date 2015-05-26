@@ -141,11 +141,13 @@ function LSTMSentiment:train(dataset)
         loss = loss + example_loss
         local obj_grad = self.criterion:backward(output, label)
         local rep_grad = self.sentiment_module:backward(rep, obj_grad)
+        local input_grads
         if self.structure == 'lstm' then
-          self:LSTM_backward(sent, inputs, rep_grad)
+          input_grads = self:LSTM_backward(sent, inputs, rep_grad)
         elseif self.structure == 'bilstm' then
-          self:BiLSTM_backward(sent, inputs, rep_grad)
+          input_grads = self:BiLSTM_backward(sent, inputs, rep_grad)
         end
+        self.emb:backward(sent, input_grads)
       end
 
       loss = loss / batch_size
@@ -176,7 +178,8 @@ function LSTMSentiment:LSTM_backward(sent, inputs, rep_grad)
       grad[{sent:nElement(), l, {}}] = rep_grad[l]
     end
   end
-  self.lstm:backward(inputs, grad)
+  local input_grads = self.lstm:backward(inputs, grad)
+  return input_grads
 end
 
 -- Bidirectional LSTM backward propagation
@@ -195,8 +198,9 @@ function LSTMSentiment:BiLSTM_backward(sent, inputs, rep_grad)
       grad_b[{1, l, {}}] = rep_grad[2][l]
     end
   end
-  self.lstm:backward(inputs, grad)
-  self.lstm_b:backward(inputs, grad_b, true)
+  local input_grads = self.lstm:backward(inputs, grad)
+  local input_grads_b = self.lstm_b:backward(inputs, grad_b, true)
+  return input_grads + input_grads_b
 end
 
 -- Predict the sentiment of a sentence.
