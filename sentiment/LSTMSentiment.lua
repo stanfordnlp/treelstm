@@ -214,7 +214,7 @@ function LSTMSentiment:predict(sent)
     rep = self.lstm:forward(inputs)
   elseif self.structure == 'bilstm' then
     self.lstm_b:evaluate()
-    inputs = {
+    rep = {
       self.lstm:forward(inputs),
       self.lstm_b:forward(inputs, true),
     }
