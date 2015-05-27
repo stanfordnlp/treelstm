@@ -142,6 +142,10 @@ function treelstm.read_sentiment_dataset(dir, vocab, fine_grained)
   dataset.vocab = vocab
   dataset.fine_grained = fine_grained
   local trees = treelstm.read_trees(dir .. 'parents.txt', dir .. 'labels.txt')
+  for _, tree in ipairs(trees) do
+    set_spans(tree)
+  end
+
   local sents = treelstm.read_sentences(dir .. 'sents.txt', vocab)
   if not fine_grained then
     dataset.trees = {}
@@ -164,6 +168,23 @@ function treelstm.read_sentiment_dataset(dir, vocab, fine_grained)
     dataset.labels[i] = dataset.trees[i].gold_label
   end
   return dataset
+end
+
+function set_spans(tree)
+  if tree.num_children == 0 then
+    tree.lo, tree.hi = tree.leaf_idx, tree.leaf_idx
+    return
+  end
+
+  for i = 1, tree.num_children do
+    set_spans(tree.children[i])
+  end
+
+  tree.lo, tree.hi = tree.children[1].lo, tree.children[1].hi
+  for i = 2, tree.num_children do
+    tree.lo = math.min(tree.lo, tree.children[i].lo)
+    tree.hi = math.max(tree.hi, tree.children[i].hi)
+  end
 end
 
 function remap_labels(tree, fine_grained)

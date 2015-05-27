@@ -11,11 +11,12 @@ function LSTMSentiment:__init(config)
   self.learning_rate     = config.learning_rate     or 0.05
   self.emb_learning_rate = config.emb_learning_rate or 0.1
   self.num_layers        = config.num_layers        or 1
-  self.batch_size        = config.batch_size        or 25
+  self.batch_size        = config.batch_size        or 5
   self.reg               = config.reg               or 1e-4
   self.structure         = config.structure         or 'lstm' -- {lstm, bilstm}
   self.fine_grained      = (config.fine_grained == nil) and true or config.fine_grained
   self.dropout           = (config.dropout == nil) and true or config.dropout
+  self.train_subtrees    = 4  -- number of subtrees to sample during training
 
   -- word embedding
   self.emb_dim = config.emb_vecs:size(2)
@@ -118,41 +119,47 @@ function LSTMSentiment:train(dataset)
       local loss = 0
       for j = 1, batch_size do
         local idx = indices[i + j - 1]
+        local tree = dataset.trees[idx]
         local sent = dataset.sents[idx]
-        local label = dataset.labels[idx]
-        local inputs = self.emb:forward(sent)
+        local subtrees = tree:depth_first_preorder()
+        for k = 1, self.train_subtrees + 1 do
+          local subtree = (k == 1) and tree or subtrees[math.ceil(torch.uniform(1, #subtrees))]
+          local span = sent[{{subtree.lo, subtree.hi}}]
+          local inputs = self.emb:forward(span)
 
-        -- get sentence representations
-        local rep
-        if self.structure == 'lstm' then
-          rep = self.lstm:forward(inputs)
-        elseif self.structure == 'bilstm' then
-          rep = {
-            self.lstm:forward(inputs),
-            self.lstm_b:forward(inputs, true), -- true => reverse
-          }
+          -- get sentence representations
+          local rep
+          if self.structure == 'lstm' then
+            rep = self.lstm:forward(inputs)
+          elseif self.structure == 'bilstm' then
+            rep = {
+              self.lstm:forward(inputs),
+              self.lstm_b:forward(inputs, true), -- true => reverse
+            }
+          end
+
+          -- compute class log probabilities
+          local output = self.sentiment_module:forward(rep)
+
+          -- compute loss and backpropagate
+          local example_loss = self.criterion:forward(output, subtree.gold_label)
+          loss = loss + example_loss
+          local obj_grad = self.criterion:backward(output, subtree.gold_label)
+          local rep_grad = self.sentiment_module:backward(rep, obj_grad)
+          local input_grads
+          if self.structure == 'lstm' then
+            input_grads = self:LSTM_backward(sent, inputs, rep_grad)
+          elseif self.structure == 'bilstm' then
+            input_grads = self:BiLSTM_backward(sent, inputs, rep_grad)
+          end
+          self.emb:backward(span, input_grads)
         end
-
-        -- compute class log probabilities
-        local output = self.sentiment_module:forward(rep)
-
-        -- compute loss and backpropagate
-        local example_loss = self.criterion:forward(output, label)
-        loss = loss + example_loss
-        local obj_grad = self.criterion:backward(output, label)
-        local rep_grad = self.sentiment_module:backward(rep, obj_grad)
-        local input_grads
-        if self.structure == 'lstm' then
-          input_grads = self:LSTM_backward(sent, inputs, rep_grad)
-        elseif self.structure == 'bilstm' then
-          input_grads = self:BiLSTM_backward(sent, inputs, rep_grad)
-        end
-        self.emb:backward(sent, input_grads)
       end
 
-      loss = loss / batch_size
-      self.grad_params:div(batch_size)
-      self.emb.gradWeight:div(batch_size)
+      local batch_subtrees = batch_size * (self.train_subtrees + 1)
+      loss = loss / batch_subtrees
+      self.grad_params:div(batch_subtrees)
+      self.emb.gradWeight:div(batch_subtrees)
 
       -- regularization
       loss = loss + 0.5 * self.reg * self.params:norm() ^ 2
@@ -266,7 +273,7 @@ function LSTMSentiment:print_config()
   printf('%-25s = %s\n',   'LSTM structure', self.structure)
   printf('%-25s = %d\n',   'LSTM layers', self.num_layers)
   printf('%-25s = %.2e\n', 'regularization strength', self.reg)
-  printf('%-25s = %d\n',   'minibatch size', self.batch_size)
+  printf('%-25s = %d\n',   'minibatch size', self.batch_size * (self.train_subtrees + 1))
   printf('%-25s = %.2e\n', 'learning rate', self.learning_rate)
   printf('%-25s = %.2e\n', 'word vector learning rate', self.emb_learning_rate)
   printf('%-25s = %s\n',   'dropout', tostring(self.dropout))
