@@ -86,6 +86,7 @@ printf('num test  = %d\n', test_dataset.size)
 -- initialize model
 local model = model_class{
   emb_vecs = vecs,
+  structure = model_structure,
   fine_grained = fine_grained,
   num_layers = args.layers,
   mem_dim = args.dim,
@@ -125,6 +126,7 @@ for i = 1, num_epochs do
     best_dev_score = dev_score
     best_dev_model = model_class{
       emb_vecs = vecs,
+      structure = model_structure,
       fine_grained = fine_grained,
       num_layers = args.layers,
       mem_dim = args.dim,
