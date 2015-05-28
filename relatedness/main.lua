@@ -16,26 +16,27 @@ end
 -- read command line arguments
 local args = lapp [[
 Training script for semantic relatedness prediction on the SICK dataset.
-  -m,--model  (default dependency) Model architecture: [dependency, lstm, bilstm]
+  -m,--model  (default dependency) Model architecture: [dependency, constituency, lstm, bilstm]
   -l,--layers (default 1)          Number of layers (ignored for Tree-LSTM)
   -d,--dim    (default 150)        LSTM memory dimension
   -e,--epochs (default 10)         Number of training epochs
 ]]
 
-local model_name, model_class, model_structure
+local model_name, model_class
 if args.model == 'dependency' then
   model_name = 'Dependency Tree LSTM'
   model_class = treelstm.TreeLSTMSim
-  model_structure = args.model
+elseif args.model == 'constituency' then
+  model_name = 'Constituency Tree LSTM'
+  model_class = treelstm.TreeLSTMSim
 elseif args.model == 'lstm' then
   model_name = 'LSTM'
   model_class = treelstm.LSTMSim
-  model_structure = args.model
 elseif args.model == 'bilstm' then
   model_name = 'Bidirectional LSTM'
   model_class = treelstm.LSTMSim
-  model_structure = args.model
 end
+local model_structure = args.model
 header(model_name .. ' for Semantic Relatedness')
 
 -- directory containing dataset files
@@ -73,9 +74,10 @@ print('loading datasets')
 local train_dir = data_dir .. 'train/'
 local dev_dir = data_dir .. 'dev/'
 local test_dir = data_dir .. 'test/'
-local train_dataset = treelstm.read_relatedness_dataset(train_dir, vocab)
-local dev_dataset = treelstm.read_relatedness_dataset(dev_dir, vocab)
-local test_dataset = treelstm.read_relatedness_dataset(test_dir, vocab)
+local constituency = (args.model == 'constituency')
+local train_dataset = treelstm.read_relatedness_dataset(train_dir, vocab, constituency)
+local dev_dataset = treelstm.read_relatedness_dataset(dev_dir, vocab, constituency)
+local test_dataset = treelstm.read_relatedness_dataset(test_dir, vocab, constituency)
 printf('num train = %d\n', train_dataset.size)
 printf('num dev   = %d\n', dev_dataset.size)
 printf('num test  = %d\n', test_dataset.size)

@@ -9,14 +9,16 @@ local TreeLSTMSim = torch.class('treelstm.TreeLSTMSim')
 function TreeLSTMSim:__init(config)
   self.mem_dim       = config.mem_dim       or 150
   self.learning_rate = config.learning_rate or 0.05
+  self.emb_learning_rate = config.emb_learning_rate or 0.0
   self.batch_size    = config.batch_size    or 25
   self.reg           = config.reg           or 1e-4
   self.structure     = config.structure     or 'dependency'
   self.sim_nhidden   = config.sim_nhidden   or 50
 
   -- word embedding
-  self.emb_vecs = config.emb_vecs
   self.emb_dim = config.emb_vecs:size(2)
+  self.emb = nn.LookupTable(config.emb_vecs:size(1), self.emb_dim)
+  self.emb.weight:copy(config.emb_vecs)
 
   -- number of similarity rating classes
   self.num_classes = 5
@@ -35,6 +37,8 @@ function TreeLSTMSim:__init(config)
   }
   if self.structure == 'dependency' then
     self.treelstm = treelstm.ChildSumTreeLSTM(treelstm_config)
+  elseif self.structure == 'constituency' then
+    self.treelstm = treelstm.BinaryTreeLSTM(treelstm_config)
   else
     error('invalid parse tree type: ' .. self.structure)
   end
@@ -89,13 +93,15 @@ function TreeLSTMSim:train(dataset)
 
     local feval = function(x)
       self.grad_params:zero()
+      self.emb:zeroGradParameters()
       local loss = 0
       for j = 1, batch_size do
         local idx = indices[i + j - 1]
         local ltree, rtree = dataset.ltrees[idx], dataset.rtrees[idx]
         local lsent, rsent = dataset.lsents[idx], dataset.rsents[idx]
-        local linputs = self.emb_vecs:index(1, lsent:long()):double()
-        local rinputs = self.emb_vecs:index(1, rsent:long()):double()
+        self.emb:forward(lsent)
+        local linputs = torch.Tensor(self.emb.output:size()):copy(self.emb.output)
+        local rinputs = self.emb:forward(rsent)
 
         -- get sentence representations
         local lrep = self.treelstm:forward(ltree, linputs)[2]
@@ -109,12 +115,16 @@ function TreeLSTMSim:train(dataset)
         loss = loss + example_loss
         local sim_grad = self.criterion:backward(output, targets[j])
         local rep_grad = self.sim_module:backward({lrep, rrep}, sim_grad)
-        self.treelstm:backward(dataset.ltrees[idx], linputs, {zeros, rep_grad[1]})
-        self.treelstm:backward(dataset.rtrees[idx], rinputs, {zeros, rep_grad[2]})
+        local linput_grads = self.treelstm:backward(dataset.ltrees[idx], linputs, {zeros, rep_grad[1]})
+        local rinput_grads = self.treelstm:backward(dataset.rtrees[idx], rinputs, {zeros, rep_grad[2]})
+        self.emb:backward(lsent, linput_grads)
+        self.emb:backward(rsent, rinput_grads)
       end
 
       loss = loss / batch_size
       self.grad_params:div(batch_size)
+      self.emb.gradWeight:div(batch_size)
+      self.emb:updateParameters(self.emb_learning_rate)
 
       -- regularization
       loss = loss + 0.5 * self.reg * self.params:norm() ^ 2
@@ -129,9 +139,9 @@ end
 
 -- Predict the similarity of a sentence pair.
 function TreeLSTMSim:predict(ltree, rtree, lsent, rsent)
-  local linputs = self.emb_vecs:index(1, lsent:long()):double()
-  local rinputs = self.emb_vecs:index(1, rsent:long()):double()
+  local linputs = self.emb:forward(lsent)
   local lrep = self.treelstm:forward(ltree, linputs)[2]
+  local rinputs = self.emb:forward(rsent)
   local rrep = self.treelstm:forward(rtree, rinputs)[2]
   local output = self.sim_module:forward{lrep, rrep}
   self.treelstm:clean(ltree)
@@ -155,15 +165,16 @@ end
 function TreeLSTMSim:print_config()
   local num_params = self.params:size(1)
   local num_sim_params = self:new_sim_module():getParameters():size(1)
-  printf('%-25s = %d\n', 'num params', num_params)
-  printf('%-25s = %d\n', 'num compositional params', num_params - num_sim_params)
-  printf('%-25s = %d\n', 'word vector dim', self.emb_dim)
-  printf('%-25s = %d\n', 'Tree-LSTM memory dim', self.mem_dim)
+  printf('%-25s = %d\n',   'num params', num_params)
+  printf('%-25s = %d\n',   'num compositional params', num_params - num_sim_params)
+  printf('%-25s = %d\n',   'word vector dim', self.emb_dim)
+  printf('%-25s = %d\n',   'Tree-LSTM memory dim', self.mem_dim)
   printf('%-25s = %.2e\n', 'regularization strength', self.reg)
-  printf('%-25s = %d\n', 'minibatch size', self.batch_size)
+  printf('%-25s = %d\n',   'minibatch size', self.batch_size)
   printf('%-25s = %.2e\n', 'learning rate', self.learning_rate)
-  printf('%-25s = %s\n', 'parse tree type', self.structure)
-  printf('%-25s = %d\n', 'sim module hidden dim', self.sim_nhidden)
+  printf('%-25s = %.2e\n', 'word vector learning rate', self.emb_learning_rate)
+  printf('%-25s = %s\n',   'parse tree type', self.structure)
+  printf('%-25s = %d\n',   'sim module hidden dim', self.sim_nhidden)
 end
 
 --
@@ -173,8 +184,9 @@ end
 function TreeLSTMSim:save(path)
   local config = {
     batch_size    = self.batch_size,
-    emb_vecs      = self.emb_vecs:float(),
+    emb_vecs      = self.emb.weight:float(),
     learning_rate = self.learning_rate,
+    emb_learning_rate = self.emb_learning_rate,
     mem_dim       = self.mem_dim,
     sim_nhidden   = self.sim_nhidden,
     reg           = self.reg,

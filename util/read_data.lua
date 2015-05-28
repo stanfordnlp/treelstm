@@ -110,11 +110,16 @@ end
 
 --]]
 
-function treelstm.read_relatedness_dataset(dir, vocab)
+function treelstm.read_relatedness_dataset(dir, vocab, constituency)
   local dataset = {}
   dataset.vocab = vocab
-  dataset.ltrees = treelstm.read_trees(dir .. 'a.parents')
-  dataset.rtrees = treelstm.read_trees(dir .. 'b.parents')
+  if constituency then
+    dataset.ltrees = treelstm.read_trees(dir .. 'a.cparents')
+    dataset.rtrees = treelstm.read_trees(dir .. 'b.cparents')
+  else
+    dataset.ltrees = treelstm.read_trees(dir .. 'a.parents')
+    dataset.rtrees = treelstm.read_trees(dir .. 'b.parents')
+  end
   dataset.lsents = treelstm.read_sentences(dir .. 'a.toks', vocab)
   dataset.rsents = treelstm.read_sentences(dir .. 'b.toks', vocab)
   dataset.size = #dataset.ltrees

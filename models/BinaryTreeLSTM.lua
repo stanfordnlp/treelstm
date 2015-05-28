@@ -10,8 +10,9 @@ function BinaryTreeLSTM:__init(config)
   parent.__init(self, config)
   self.in_dim  = config.in_dim
   if self.in_dim == nil then error('input dimension must be specified') end
-
   self.mem_dim = config.mem_dim or 150
+  self.gate_output = config.gate_output
+  if self.gate_output == nil then self.gate_output = true end
 
   -- a function that instantiates an output module that takes the hidden state
   -- h as input
@@ -37,8 +38,13 @@ end
 function BinaryTreeLSTM:new_leaf_module()
   local input = nn.Identity()()
   local c = nn.Linear(self.in_dim, self.mem_dim)(input)
-  local o = nn.Sigmoid()(nn.Linear(self.in_dim, self.mem_dim)(input))
-  local h = nn.CMulTable(){o, nn.Tanh()(c)}
+  local h
+  if self.gate_output then
+    local o = nn.Sigmoid()(nn.Linear(self.in_dim, self.mem_dim)(input))
+    h = nn.CMulTable(){o, nn.Tanh()(c)}
+  else
+    h = nn.Tanh()(c)
+  end
 
   local leaf_module = nn.gModule({input}, {c, h})
   if self.leaf_module ~= nil then
@@ -60,14 +66,20 @@ function BinaryTreeLSTM:new_composer()
   local i = nn.Sigmoid()(new_gate())    -- input gate
   local lf = nn.Sigmoid()(new_gate())   -- left forget gate
   local rf = nn.Sigmoid()(new_gate())   -- right forget gate
-  local o = nn.Sigmoid()(new_gate())    -- output gate
   local update = nn.Tanh()(new_gate())  -- memory cell update vector
   local c = nn.CAddTable(){             -- memory cell
       nn.CMulTable(){i, update},
       nn.CMulTable(){lf, lc},
       nn.CMulTable(){rf, rc}
     }
-  local h = nn.CMulTable(){o, nn.Tanh()(c)}  -- hidden state vector
+
+  local h
+  if self.gate_output then
+    local o = nn.Sigmoid()(new_gate()) -- output gate
+    h = nn.CMulTable(){o, nn.Tanh()(c)}
+  else
+    h = nn.Tanh()(c)
+  end
   local composer = nn.gModule(
     {lc, lh, rc, rh},
     {c, h})
