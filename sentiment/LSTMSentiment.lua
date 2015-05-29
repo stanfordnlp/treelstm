@@ -60,7 +60,7 @@ function LSTMSentiment:__init(config)
   -- share must only be called after getParameters, since this changes the
   -- location of the parameters
   if self.structure == 'bilstm' then
-    self.lstm_b:share(self.lstm, 'weight', 'bias', 'gradWeight', 'gradBias')
+    share_params(self.lstm_b, self.lstm)
   end
 end
 

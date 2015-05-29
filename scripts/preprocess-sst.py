@@ -6,7 +6,11 @@ Preprocessing script for Stanford Sentiment Treebank data.
 import os
 import glob
 
-class Tree(object):
+#
+# Trees and tree loading
+#
+
+class ConstTree(object):
     def __init__(self):
         self.left = None
         self.right = None
@@ -19,14 +23,14 @@ class Tree(object):
             self.size += self.right.size()
         return self.size
 
-    def label_spans(self):
-        if self.label is not None:
-            self.span = self.label
+    def set_spans(self):
+        if self.word is not None:
+            self.span = self.word
             return self.span
 
-        self.span = self.left.label_spans()
+        self.span = self.left.set_spans()
         if self.right is not None:
-            self.span += ' ' + self.right.label_spans()
+            self.span += ' ' + self.right.set_spans()
         return self.span
 
     def get_labels(self, spans, labels, dictionary):
@@ -38,40 +42,72 @@ class Tree(object):
         if self.right is not None:
             self.right.get_labels(spans, labels, dictionary)
 
+class DepTree(object):
+    def __init__(self):
+        self.children = []
+        self.lo, self.hi = None, None
+
+    def size(self):
+        self.size = 1
+        for c in self.children:
+            self.size += c.size()
+        return self.size
+
+    def set_spans(self, words):
+        self.lo, self.hi = self.idx, self.idx + 1
+        if len(self.children) == 0:
+            self.span = words[self.idx]
+            return
+        for c in self.children:
+            c.set_spans(words)
+            self.lo = min(self.lo, c.lo)
+            self.hi = max(self.hi, c.hi)
+        self.span = ' '.join(words[self.lo : self.hi])
+
+    def get_labels(self, spans, labels, dictionary):
+        if self.span in dictionary:
+            spans[self.idx] = self.span
+            labels[self.idx] = dictionary[self.span]
+        for c in self.children:
+            c.get_labels(spans, labels, dictionary)
+
 def load_trees(dirpath):
+    const_trees, dep_trees, toks = [], [], []
     with open(os.path.join(dirpath, 'parents.txt')) as parentsfile, \
+         open(os.path.join(dirpath, 'dparents.txt')) as dparentsfile, \
          open(os.path.join(dirpath, 'sents.txt')) as toksfile:
-        parents, toks, trees = [], [], []
+        parents, dparents = [], []
         for line in parentsfile:
             parents.append(map(int, line.split()))
+        for line in dparentsfile:
+            dparents.append(map(int, line.split()))
         for line in toksfile:
             toks.append(line.strip().split())
         for i in xrange(len(toks)):
-            trees.append(load_tree(parents[i], toks[i]))
-    return trees
+            const_trees.append(load_constituency_tree(parents[i], toks[i]))
+            dep_trees.append(load_dependency_tree(dparents[i]))
+    return const_trees, dep_trees, toks
 
-def load_tree(parents, labels):
+def load_constituency_tree(parents, words):
     trees = []
     root = None
     size = len(parents)
     for i in xrange(size):
         trees.append(None)
 
-    label_idx = 0
+    word_idx = 0
     for i in xrange(size):
         if not trees[i]:
             idx = i
             prev = None
             prev_idx = None
-            label = labels[label_idx]
-            label_idx += 1
+            word = words[word_idx]
+            word_idx += 1
             while True:
-                tree = Tree()
+                tree = ConstTree()
                 parent = parents[idx] - 1
-                tree.label = label
-                label = None
-                tree.parent = parent
-                tree.idx = idx
+                tree.word, tree.parent, tree.idx = word, parent, idx
+                word = None
                 if prev is not None:
                     if tree.left is None:
                         tree.left = prev
@@ -92,6 +128,46 @@ def load_tree(parents, labels):
                     prev_idx = idx
                     idx = parent
     return root
+
+def load_dependency_tree(parents):
+    trees = []
+    root = None
+    size = len(parents)
+    for i in xrange(size):
+        trees.append(None)
+
+    for i in xrange(size):
+        if not trees[i]:
+            idx = i
+            prev = None
+            prev_idx = None
+            while True:
+                tree = DepTree()
+                parent = parents[idx] - 1
+
+                # node is not in tree
+                if parent == -2:
+                    break
+
+                tree.parent, tree.idx = parent, idx
+                if prev is not None:
+                    tree.children.append(prev)
+                trees[idx] = tree
+                if parent >= 0 and trees[parent] is not None:
+                    trees[parent].children.append(tree)
+                    break
+                elif parent == -1:
+                    root = tree
+                    break
+                else:
+                    prev = tree
+                    prev_idx = idx
+                    idx = parent
+    return root
+
+#
+# Various utilities
+#
 
 def make_dirs(dirs):
     for d in dirs:
@@ -203,23 +279,43 @@ def get_labels(tree, dictionary):
 
 def write_labels(dirpath, dictionary):
     print('Writing labels for trees in ' + dirpath)
-    with open(os.path.join(dirpath, 'labels.txt'), 'w') as labels:
-        trees = load_trees(dirpath)
-        for i in xrange(len(trees)):
-            trees[i].label_spans()
+    with open(os.path.join(dirpath, 'labels.txt'), 'w') as labels, \
+         open(os.path.join(dirpath, 'dlabels.txt'), 'w') as dlabels:
+        # load constituency and dependency trees
+        const_trees, dep_trees, toks = load_trees(dirpath)
+
+        # write span labels
+        for i in xrange(len(const_trees)):
+            const_trees[i].set_spans()
+            dep_trees[i].set_spans(toks[i])
+
+            # const tree labels
             s, l = [], []
-            for j in xrange(trees[i].size()):
+            for j in xrange(const_trees[i].size()):
                 s.append(None)
                 l.append(None)
-            trees[i].get_labels(s, l, dictionary)
+            const_trees[i].get_labels(s, l, dictionary)
             labels.write(' '.join(map(str, l)) + '\n')
 
-def dependency_parse(filepath, cp=''):
+            # dep tree labels
+            dep_trees[i].span = const_trees[i].span
+            s, l = [], []
+            for j in xrange(len(toks[i])):
+                s.append(None)
+                l.append('#')
+            dep_trees[i].get_labels(s, l, dictionary)
+            dlabels.write(' '.join(map(str, l)) + '\n')
+
+def dependency_parse(filepath, cp='', tokenize=True):
     print('\nDependency parsing ' + filepath)
     dirpath = os.path.dirname(filepath)
+    filepre = os.path.splitext(os.path.basename(filepath))[0]
+    tokpath = os.path.join(dirpath, filepre + '.toks')
     parentpath = os.path.join(dirpath, 'dparents.txt')
-    cmd = ('java -cp %s ConstituencyParse -deps - -parentpath %s < %s'
-        % (cp, parentpath, filepath))
+    relpath =  os.path.join(dirpath, 'rels.txt')
+    tokenize_flag = '-tokenize - ' if tokenize else ''
+    cmd = ('java -cp %s DependencyParse -tokpath %s -parentpath %s -relpath %s %s < %s'
+        % (cp, tokpath, parentpath, relpath, tokenize_flag, filepath))
     os.system(cmd)
 
 if __name__ == '__main__':
@@ -246,7 +342,7 @@ if __name__ == '__main__':
         os.path.join(lib_dir, 'stanford-parser/stanford-parser.jar'),
         os.path.join(lib_dir, 'stanford-parser/stanford-parser-3.5.1-models.jar')])
     for filepath in sent_paths:
-        dependency_parse(filepath, cp=classpath)
+        dependency_parse(filepath, cp=classpath, tokenize=False)
 
     # get vocabulary
     build_vocab(sent_paths, os.path.join(sst_dir, 'vocab.txt'))

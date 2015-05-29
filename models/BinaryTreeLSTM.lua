@@ -8,19 +8,12 @@ local BinaryTreeLSTM, parent = torch.class('treelstm.BinaryTreeLSTM', 'treelstm.
 
 function BinaryTreeLSTM:__init(config)
   parent.__init(self, config)
-  self.in_dim  = config.in_dim
-  if self.in_dim == nil then error('input dimension must be specified') end
-  self.mem_dim = config.mem_dim or 150
   self.gate_output = config.gate_output
   if self.gate_output == nil then self.gate_output = true end
 
-  -- a function that instantiates an output module that takes the hidden state
-  -- h as input
+  -- a function that instantiates an output module that takes the hidden state h as input
   self.output_module_fn = config.output_module_fn
   self.criterion = config.criterion
-
-  -- zero vectors for null inputs
-  self.mem_zeros = torch.zeros(self.mem_dim)
 
   -- leaf input module
   self.leaf_module = self:new_leaf_module()
@@ -48,7 +41,7 @@ function BinaryTreeLSTM:new_leaf_module()
 
   local leaf_module = nn.gModule({input}, {c, h})
   if self.leaf_module ~= nil then
-    share_params(leaf_module, self.leaf_module, 'weight', 'bias', 'gradWeight', 'gradBias')
+    share_params(leaf_module, self.leaf_module)
   end
   return leaf_module
 end
@@ -85,7 +78,7 @@ function BinaryTreeLSTM:new_composer()
     {c, h})
 
   if self.composer ~= nil then
-    share_params(composer, self.composer, 'weight', 'bias', 'gradWeight', 'gradBias')
+    share_params(composer, self.composer)
   end
   return composer
 end
@@ -94,7 +87,7 @@ function BinaryTreeLSTM:new_output_module()
   if self.output_module_fn == nil then return nil end
   local output_module = self.output_module_fn()
   if self.output_module ~= nil then
-    output_module:share(self.output_module, 'weight', 'bias', 'gradWeight', 'gradBias')
+    share_params(output_module, self.output_module)
   end
   return output_module
 end
@@ -137,7 +130,7 @@ end
 
 function BinaryTreeLSTM:_backward(tree, inputs, grad, grad_inputs)
   local output_grad = self.mem_zeros
-  if tree.output ~= nil then
+  if tree.output ~= nil and tree.gold_label ~= nil then
     output_grad = tree.output_module:backward(
       tree.state[2], self.criterion:backward(tree.output, tree.gold_label))
   end

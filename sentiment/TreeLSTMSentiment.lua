@@ -12,6 +12,7 @@ function TreeLSTMSentiment:__init(config)
   self.emb_learning_rate = config.emb_learning_rate or 0.1
   self.batch_size        = config.batch_size        or 25
   self.reg               = config.reg               or 1e-4
+  self.structure         = config.structure         or 'constituency'
   self.fine_grained      = (config.fine_grained == nil) and true or config.fine_grained
   self.dropout           = (config.dropout == nil) and true or config.dropout
 
@@ -29,12 +30,20 @@ function TreeLSTMSentiment:__init(config)
   -- negative log likelihood optimization objective
   self.criterion = nn.ClassNLLCriterion()
 
-  self.treelstm = treelstm.BinaryTreeLSTM{
+  local treelstm_config = {
     in_dim  = self.emb_dim,
     mem_dim = self.mem_dim,
     output_module_fn = function() return self:new_sentiment_module() end,
     criterion = self.criterion,
   }
+
+  if self.structure == 'dependency' then
+    self.treelstm = treelstm.ChildSumTreeLSTM(treelstm_config)
+  elseif self.structure == 'constituency' then
+    self.treelstm = treelstm.BinaryTreeLSTM(treelstm_config)
+  else
+    error('invalid parse tree type: ' .. self.structure)
+  end
 
   self.params, self.grad_params = self.treelstm:getParameters()
 end
@@ -152,6 +161,7 @@ function TreeLSTMSentiment:save(path)
     learning_rate     = self.learning_rate,
     mem_dim           = self.mem_dim,
     reg               = self.reg,
+    structure         = self.structure,
   }
 
   torch.save(path, {

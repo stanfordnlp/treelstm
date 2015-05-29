@@ -25,16 +25,17 @@ local model_name, model_class, model_structure
 if args.model == 'constituency' then
   model_name = 'Constituency Tree LSTM'
   model_class = treelstm.TreeLSTMSentiment
-  model_structure = args.model
+elseif args.model == 'dependency' then
+  model_name = 'Dependency Tree LSTM'
+  model_class = treelstm.TreeLSTMSentiment
 elseif args.model == 'lstm' then
   model_name = 'LSTM'
   model_class = treelstm.LSTMSentiment
-  model_structure = args.model
 elseif args.model == 'bilstm' then
   model_name = 'Bidirectional LSTM'
   model_class = treelstm.LSTMSentiment
-  model_structure = args.model
 end
+model_structure = args.model
 header(model_name .. ' for Sentiment Classification')
 
 -- binary or fine-grained subtask
@@ -75,9 +76,10 @@ print('loading datasets')
 local train_dir = data_dir .. 'train/'
 local dev_dir = data_dir .. 'dev/'
 local test_dir = data_dir .. 'test/'
-local train_dataset = treelstm.read_sentiment_dataset(train_dir, vocab, fine_grained)
-local dev_dataset = treelstm.read_sentiment_dataset(dev_dir, vocab, fine_grained)
-local test_dataset = treelstm.read_sentiment_dataset(test_dir, vocab, fine_grained)
+local dependency = (args.model == 'dependency')
+local train_dataset = treelstm.read_sentiment_dataset(train_dir, vocab, fine_grained, dependency)
+local dev_dataset = treelstm.read_sentiment_dataset(dev_dir, vocab, fine_grained, dependency)
+local test_dataset = treelstm.read_sentiment_dataset(test_dir, vocab, fine_grained, dependency)
 
 printf('num train = %d\n', train_dataset.size)
 printf('num dev   = %d\n', dev_dataset.size)

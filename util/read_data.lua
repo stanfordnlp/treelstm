@@ -50,7 +50,12 @@ function treelstm.read_trees(parent_path, label_path)
     if label_file ~= nil then
       labels = stringx.split(label_file:read())
       for i, l in ipairs(labels) do
-        labels[i] = tonumber(l)
+        -- ignore unlabeled nodes
+        if l == '#' then
+          labels[i] = nil
+        else
+          labels[i] = tonumber(l)
+        end
       end
     end
 
@@ -72,6 +77,10 @@ function treelstm.read_tree(parents, labels)
       local prev = nil
       while true do
         local parent = parents[idx]
+        if parent == -1 then
+          break
+        end
+
         local tree = treelstm.Tree()
         if prev ~= nil then
           tree:add_child(prev)
@@ -93,11 +102,12 @@ function treelstm.read_tree(parents, labels)
     end
   end
 
-  -- index leaves
+  -- index leaves (only meaningful for constituency trees)
   local leaf_idx = 1
   for i = 1, size do
-    if trees[i].num_children == 0 then
-      trees[i].leaf_idx = leaf_idx
+    local tree = trees[i]
+    if tree ~= nil and tree.num_children == 0 then
+      tree.leaf_idx = leaf_idx
       leaf_idx = leaf_idx + 1
     end
   end
@@ -142,13 +152,18 @@ end
 
 --]]
 
-function treelstm.read_sentiment_dataset(dir, vocab, fine_grained)
+function treelstm.read_sentiment_dataset(dir, vocab, fine_grained, dependency)
   local dataset = {}
   dataset.vocab = vocab
   dataset.fine_grained = fine_grained
-  local trees = treelstm.read_trees(dir .. 'parents.txt', dir .. 'labels.txt')
-  for _, tree in ipairs(trees) do
-    set_spans(tree)
+  local trees
+  if dependency then
+    trees = treelstm.read_trees(dir .. 'dparents.txt', dir .. 'dlabels.txt')
+  else
+    trees = treelstm.read_trees(dir .. 'parents.txt', dir .. 'labels.txt')
+    for _, tree in ipairs(trees) do
+      set_spans(tree)
+    end
   end
 
   local sents = treelstm.read_sentences(dir .. 'sents.txt', vocab)
@@ -193,17 +208,20 @@ function set_spans(tree)
 end
 
 function remap_labels(tree, fine_grained)
-  if fine_grained then
-    tree.gold_label = tree.gold_label + 3
-  else
-    if tree.gold_label < 0 then
-      tree.gold_label = 1
-    elseif tree.gold_label == 0 then
-      tree.gold_label = 2
+  if tree.gold_label ~= nil then
+    if fine_grained then
+      tree.gold_label = tree.gold_label + 3
     else
-      tree.gold_label = 3
+      if tree.gold_label < 0 then
+        tree.gold_label = 1
+      elseif tree.gold_label == 0 then
+        tree.gold_label = 2
+      else
+        tree.gold_label = 3
+      end
     end
   end
+
   for i = 1, tree.num_children do
     remap_labels(tree.children[i], fine_grained)
   end

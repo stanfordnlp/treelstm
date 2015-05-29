@@ -94,7 +94,7 @@ function LSTM:new_cell()
 
   -- share parameters
   if self.master_cell then
-    share_params(cell, self.master_cell, 'weight', 'bias', 'gradWeight', 'gradBias')
+    share_params(cell, self.master_cell)
   end
   return cell
 end

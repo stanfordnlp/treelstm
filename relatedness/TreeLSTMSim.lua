@@ -12,7 +12,7 @@ function TreeLSTMSim:__init(config)
   self.emb_learning_rate = config.emb_learning_rate or 0.0
   self.batch_size    = config.batch_size    or 25
   self.reg           = config.reg           or 1e-4
-  self.structure     = config.structure     or 'dependency'
+  self.structure     = config.structure     or 'dependency' -- {dependency, constituency}
   self.sim_nhidden   = config.sim_nhidden   or 50
 
   -- word embedding
@@ -35,6 +35,7 @@ function TreeLSTMSim:__init(config)
     mem_dim = self.mem_dim,
     gate_output = false,
   }
+  
   if self.structure == 'dependency' then
     self.treelstm = treelstm.ChildSumTreeLSTM(treelstm_config)
   elseif self.structure == 'constituency' then
