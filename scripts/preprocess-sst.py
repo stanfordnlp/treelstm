@@ -214,6 +214,14 @@ def write_labels(dirpath, dictionary):
             trees[i].get_labels(s, l, dictionary)
             labels.write(' '.join(map(str, l)) + '\n')
 
+def dependency_parse(filepath, cp=''):
+    print('\nDependency parsing ' + filepath)
+    dirpath = os.path.dirname(filepath)
+    parentpath = os.path.join(dirpath, 'dparents.txt')
+    cmd = ('java -cp %s ConstituencyParse -deps - -parentpath %s < %s'
+        % (cp, parentpath, filepath))
+    os.system(cmd)
+
 if __name__ == '__main__':
     print('=' * 80)
     print('Preprocessing Stanford Sentiment Treebank')
@@ -221,6 +229,7 @@ if __name__ == '__main__':
 
     base_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     data_dir = os.path.join(base_dir, 'data')
+    lib_dir = os.path.join(base_dir, 'lib')
     sst_dir = os.path.join(data_dir, 'sst')
     train_dir = os.path.join(sst_dir, 'train')
     dev_dir = os.path.join(sst_dir, 'dev')
@@ -229,15 +238,19 @@ if __name__ == '__main__':
 
     # produce train/dev/test splits
     split(sst_dir, train_dir, dev_dir, test_dir)
+    sent_paths = glob.glob(os.path.join(sst_dir, '*/sents.txt'))
+
+    # produce dependency parses
+    classpath = ':'.join([
+        lib_dir,
+        os.path.join(lib_dir, 'stanford-parser/stanford-parser.jar'),
+        os.path.join(lib_dir, 'stanford-parser/stanford-parser-3.5.1-models.jar')])
+    for filepath in sent_paths:
+        dependency_parse(filepath, cp=classpath)
 
     # get vocabulary
-    build_vocab(
-        glob.glob(os.path.join(sst_dir, '*/sents.txt')),
-        os.path.join(sst_dir, 'vocab.txt'))
-    build_vocab(
-        glob.glob(os.path.join(sst_dir, '*/sents.txt')),
-        os.path.join(sst_dir, 'vocab-cased.txt'),
-        lowercase=False)
+    build_vocab(sent_paths, os.path.join(sst_dir, 'vocab.txt'))
+    build_vocab(sent_paths, os.path.join(sst_dir, 'vocab-cased.txt'), lowercase=False)
 
     # write sentiment labels for nodes in trees
     dictionary = load_dictionary(sst_dir)

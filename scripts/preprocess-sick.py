@@ -11,11 +11,6 @@ def make_dirs(dirs):
         if not os.path.exists(d):
             os.makedirs(d)
 
-def javac(filepath, cp):
-    cmd = 'javac -cp %s %s' % (cp, filepath)
-    print(cmd)
-    os.system(cmd)
-
 def dependency_parse(filepath, cp='', tokenize=True):
     print('\nDependency parsing ' + filepath)
     dirpath = os.path.dirname(filepath)
@@ -89,9 +84,6 @@ if __name__ == '__main__':
         lib_dir,
         os.path.join(lib_dir, 'stanford-parser/stanford-parser.jar'),
         os.path.join(lib_dir, 'stanford-parser/stanford-parser-3.5.1-models.jar')])
-    javac(os.path.join(lib_dir, 'DependencyParse.java'), cp=classpath)
-    javac(os.path.join(lib_dir, 'CollapseUnaryTransformer.java'), cp=classpath)
-    javac(os.path.join(lib_dir, 'ConstituencyParse.java'), cp=classpath)
 
     # split into separate files
     split(os.path.join(sick_dir, 'SICK_train.txt'), train_dir)

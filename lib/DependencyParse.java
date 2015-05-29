@@ -19,6 +19,9 @@ import java.util.Scanner;
 
 public class DependencyParse {
 
+  public static final String TAGGER_MODEL = "stanford-tagger/models/english-left3words-distsim.tagger";
+  public static final String PARSER_MODEL = "edu/stanford/nlp/models/parser/nndep/english_SD.gz";
+
   public static void main(String[] args) throws Exception {
     Properties props = StringUtils.argsToProperties(args);
     if (!props.containsKey("tokpath") ||
@@ -42,11 +45,8 @@ public class DependencyParse {
     BufferedWriter parentWriter = new BufferedWriter(new FileWriter(parentPath));
     BufferedWriter relWriter = new BufferedWriter(new FileWriter(relPath));
 
-    MaxentTagger tagger = new MaxentTagger(
-        "stanford-tagger/models/english-left3words-distsim.tagger");
-
-    DependencyParser parser = DependencyParser.loadFromModelFile(
-      "edu/stanford/nlp/models/parser/nndep/english_SD.gz");
+    MaxentTagger tagger = new MaxentTagger(TAGGER_MODEL);
+    DependencyParser parser = DependencyParser.loadFromModelFile(PARSER_MODEL);
     Scanner stdin = new Scanner(System.in);
     int count = 0;
     long start = System.currentTimeMillis();
@@ -70,71 +70,71 @@ public class DependencyParse {
       int len = tagged.size();
       Collection<TypedDependency> tdl = parser.predict(tagged).typedDependencies();
       int[] parents = new int[len];
-        for (int i = 0; i < len; i++) {
-          // if a node has a parent of -1 at the end of parsing, then the node
-          // has no parent.
-          parents[i] = -1;
-        }
-
-        String[] relns = new String[len];
-        for (TypedDependency td : tdl) {
-          // let root have index 0
-          int child = td.dep().index();
-          int parent = td.gov().index();
-          relns[child - 1] = td.reln().toString();
-          parents[child - 1] = parent;
-        }
-
-        // print tokens
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < len - 1; i++) {
-          if (tokenize) {
-            sb.append(PTBTokenizer.ptbToken2Text(tokens.get(i).word()));
-          } else {
-            sb.append(tokens.get(i).word());
-          }
-          sb.append(' ');
-        }
-        if (tokenize) {
-          sb.append(PTBTokenizer.ptbToken2Text(tokens.get(len - 1).word()));
-        } else {
-          sb.append(tokens.get(len - 1).word());
-        }
-        sb.append('\n');
-        tokWriter.write(sb.toString());
-
-        // print parent pointers
-        sb = new StringBuilder();
-        for (int i = 0; i < len - 1; i++) {
-          sb.append(parents[i]);
-          sb.append(' ');
-        }
-        sb.append(parents[len - 1]);
-        sb.append('\n');
-        parentWriter.write(sb.toString());
-
-        // print relations
-        sb = new StringBuilder();
-        for (int i = 0; i < len - 1; i++) {
-          sb.append(relns[i]);
-          sb.append(' ');
-        }
-        sb.append(relns[len - 1]);
-        sb.append('\n');
-        relWriter.write(sb.toString());
-
-        count++;
-        if (count % 1000 == 0) {
-          double elapsed = (System.currentTimeMillis() - start) / 1000.0;
-          System.err.printf("Parsed %d lines (%.2fs)\n", count, elapsed);
-        }
+      for (int i = 0; i < len; i++) {
+        // if a node has a parent of -1 at the end of parsing, then the node
+        // has no parent.
+        parents[i] = -1;
       }
 
-      long totalTimeMillis = System.currentTimeMillis() - start;
-      System.err.printf("Done: %d lines in %.2fs (%.1fms per line)\n",
-        count, totalTimeMillis / 1000.0, totalTimeMillis / (double) count);
-      tokWriter.close();
-      parentWriter.close();
-      relWriter.close();
+      String[] relns = new String[len];
+      for (TypedDependency td : tdl) {
+        // let root have index 0
+        int child = td.dep().index();
+        int parent = td.gov().index();
+        relns[child - 1] = td.reln().toString();
+        parents[child - 1] = parent;
+      }
+
+      // print tokens
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < len - 1; i++) {
+        if (tokenize) {
+          sb.append(PTBTokenizer.ptbToken2Text(tokens.get(i).word()));
+        } else {
+          sb.append(tokens.get(i).word());
+        }
+        sb.append(' ');
+      }
+      if (tokenize) {
+        sb.append(PTBTokenizer.ptbToken2Text(tokens.get(len - 1).word()));
+      } else {
+        sb.append(tokens.get(len - 1).word());
+      }
+      sb.append('\n');
+      tokWriter.write(sb.toString());
+
+      // print parent pointers
+      sb = new StringBuilder();
+      for (int i = 0; i < len - 1; i++) {
+        sb.append(parents[i]);
+        sb.append(' ');
+      }
+      sb.append(parents[len - 1]);
+      sb.append('\n');
+      parentWriter.write(sb.toString());
+
+      // print relations
+      sb = new StringBuilder();
+      for (int i = 0; i < len - 1; i++) {
+        sb.append(relns[i]);
+        sb.append(' ');
+      }
+      sb.append(relns[len - 1]);
+      sb.append('\n');
+      relWriter.write(sb.toString());
+
+      count++;
+      if (count % 1000 == 0) {
+        double elapsed = (System.currentTimeMillis() - start) / 1000.0;
+        System.err.printf("Parsed %d lines (%.2fs)\n", count, elapsed);
+      }
     }
+
+    long totalTimeMillis = System.currentTimeMillis() - start;
+    System.err.printf("Done: %d lines in %.2fs (%.1fms per line)\n",
+      count, totalTimeMillis / 1000.0, totalTimeMillis / (double) count);
+    tokWriter.close();
+    parentWriter.close();
+    relWriter.close();
   }
+}
