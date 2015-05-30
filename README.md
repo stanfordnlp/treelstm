@@ -54,12 +54,12 @@ To train models for the semantic relatedness prediction task on the SICK dataset
 run:
 
 ```
-th relatedness/main.lua --model <dependency|lstm|bilstm> --layers <num_layers> --dim <mem_dim> --epochs <num_epochs>
+th relatedness/main.lua --model <dependency|constituency|lstm|bilstm> --layers <num_layers> --dim <mem_dim> --epochs <num_epochs>
 ```
 
 where:
 
-  - `model`: the LSTM variant to train (default: dependency, i.e. the Dependency Tree LSTM)
+  - `model`: the LSTM variant to train (default: dependency, i.e. the Dependency Tree-LSTM)
   - `layers`: the number of layers (default: 1, ignored for Tree-LSTMs)
   - `dim`: the LSTM memory dimension (default: 150)
   - `epochs`: the number of training epochs (default: 10)
@@ -71,10 +71,10 @@ The goal of this task is to predict sentiment labels for sentences. For this tas
 To train models for the sentiment classification task on the Stanford Sentiment Treebank, run:
 
 ```
-th sentiment/main.lua --model <constituency|lstm|bilstm> --layers <num_layers> --dim <mem_dim> --epochs <num_epochs>
+th sentiment/main.lua --model <constituency|dependency|lstm|bilstm> --layers <num_layers> --dim <mem_dim> --epochs <num_epochs>
 ```
 
-This trains a Constituency Tree LSTM model for the "fine-grained" 5-class classification sub-task.
+This trains a Constituency Tree-LSTM model for the "fine-grained" 5-class classification sub-task.
 
 For the binary classification sub-task, run with the `-b` or `--binary` flag, for example:
 
