@@ -19,9 +19,21 @@ import gzip
 def download(url, dirpath):
     filename = url.split('/')[-1]
     filepath = os.path.join(dirpath, filename)
-    u = urllib2.urlopen(url)
-    f = open(filepath, 'wb')
-    filesize = int(u.info().getheaders("Content-Length")[0])
+    try:
+        u = urllib2.urlopen(url)
+    except:
+        print("URL %s failed to open" %url)
+        raise Exception
+    try:
+        f = open(filepath, 'wb')
+    except:
+        print("Cannot write %s" %filepath)
+        raise Exception
+    try:
+        filesize = int(u.info().getheaders("Content-Length")[0])
+    except:
+        print("URL %s failed to report length" %url)
+        raise Exception
     print("Downloading: %s Bytes: %s" % (filename, filesize))
 
     downloaded = 0
