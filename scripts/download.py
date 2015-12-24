@@ -56,6 +56,7 @@ def download(url, dirpath):
     return filepath
 
 def unzip(filepath):
+    print("Extracting: " + filepath)
     dirpath = os.path.dirname(filepath)
     with zipfile.ZipFile(filepath) as zf:
         zf.extractall(dirpath)
@@ -95,14 +96,8 @@ def download_wordvecs(dirpath):
         return
     else:
         os.makedirs(dirpath)
-    url = 'http://www-nlp.stanford.edu/data/glove.840B.300d.txt.gz'
-    filepath = download(url, dirpath)
-    print('extracting ' + filepath)
-    with gzip.open(filepath, 'rb') as gf:
-        with open(filepath[:-3], 'w') as f:
-            for line in gf:
-                f.write(line)
-    os.remove(filepath)
+    url = 'http://www-nlp.stanford.edu/data/glove.840B.300d.zip'
+    unzip(download(url, dirpath))
 
 def download_sick(dirpath):
     if os.path.exists(dirpath):
