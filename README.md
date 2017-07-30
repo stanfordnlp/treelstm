@@ -85,3 +85,7 @@ th sentiment/main.lua -m constituency -b
 Predictions are written to the `predictions` directory and trained model parameters are saved to the `trained_models` directory.
 
 See the [paper](http://arxiv.org/abs/1503.00075) for more details on these experiments.
+
+## Third-party Implementations
+
+- A Tensorflow Fold [re-implementation](https://github.com/tensorflow/fold/blob/master/tensorflow_fold/g3doc/sentiment.ipynb) of the Tree-LSTM for sentiment classification
